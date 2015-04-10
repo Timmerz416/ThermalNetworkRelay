@@ -21,7 +21,8 @@ namespace ThermalNetworkRelay {
 		private static AnalogInput pwrInput = new AnalogInput(AnalogChannels.ANALOG_PIN_A0);	// Analog input to read thermostat power status
 
 		// Digital output ports
-		private static OutputPort relayStatusOutput = new OutputPort(Pins.GPIO_PIN_D5, false);		// Output port for the relay status led
+		private static OutputPort relayStatusOutput = new OutputPort(Pins.GPIO_PIN_D5, false);		// Output port for the relay status LED
+		private static OutputPort onboardLED = new OutputPort(Pins.ONBOARD_LED, false);				// Turn off the onboard LED
 
 		// Relay control ports
 		private static OutputPort relayPinOn = new OutputPort(Pins.GPIO_PIN_D6, false);		// Turning port low will close the relay
