@@ -25,7 +25,7 @@ namespace ThermalNetworkRelay {
 		private static OutputPort onboardLED = new OutputPort(Pins.ONBOARD_LED, false);				// Turn off the onboard LED
 
 		// Relay control ports
-		private static OutputPort relayPinOn = new OutputPort(Pins.GPIO_PIN_D6, false);		// Turning port low will close the relay
+		private static OutputPort relayPinOn = new OutputPort(Pins.GPIO_PIN_D6, false);		// Turning port high will close the relay
 		private static OutputPort relayPinOff = new OutputPort(Pins.GPIO_PIN_D7, false);	// Turning port high will open the relay
 
 		//=====================================================================
@@ -38,6 +38,7 @@ namespace ThermalNetworkRelay {
 		private static double overrideTemp = 0;	// Contains the override temperature the thermostat is targetting
 
 		// Timing variables
+//		private const int CONTROL_INTERVAL = 60000;		// For debugging
 		private const int CONTROL_INTERVAL = 300000;	// The number of microseconds between control evaluations
 		private const int SENSOR_PERIODS = 2;			// The number of control periods before a sensor evaluation
 		private static int controlLoops = 0;			// Tracks the current number of control loops without a sensor loop
@@ -489,7 +490,6 @@ namespace ThermalNetworkRelay {
 			Debug.Print("\tMeasured temperature = " + floatTemp);
 
 			// Get luminosity
-			//float luminosity = 3.3f*((float) lumInput.Read());
 			luxSensor.SetTiming(TSL2561BusSensor.GainOptions.Low, TSL2561BusSensor.IntegrationOptions.Medium);
 			float luminosity = (float) luxSensor.readOptimizedLuminosity();
 			Debug.Print("\tMeasured luminosity = " + luminosity);
@@ -538,23 +538,11 @@ namespace ThermalNetworkRelay {
 			}
 
 			//-----------------------------------------------------------------
-			// TRANSMIST THE SENSOR DATA
+			// TRANSMIT THE SENSOR DATA
 			//-----------------------------------------------------------------			
 			// Create the TxRequest packet and send the data
 			XBeeAddress64 loggerAddress = new XBeeAddress64(COORD_ADDRESS);
 			sensorSent = SendXBeeTransmission(package, loggerAddress);
-/*			if(SendXBeeTransmission(package, loggerAddress)) {
-				// Print transmission to the debugger
-				string message = "Sent the following message (" + floatTemp.ToString("F") + ", " + luminosity.ToString("F") + ", " + power.ToString("F") + ", " + relayStatus.ToString("F0") + ", " + thermoStatus.ToString("F0") + "): ";
-				for(int i = 0; i < package.Length; i++) {
-					if(i != 0) message += "-";	// Add spacers between bytes
-					message += package[i].ToString("X");	// Output byte as a hex number
-				}
-				Debug.Print(message);
-			} else {
-				Debug.Print("Error sending the sensor data");
-				// TODO - DEVELOP CODE TO SAVE TO THE DATA LOGGER
-			}*/
 		}
 
 		//=====================================================================

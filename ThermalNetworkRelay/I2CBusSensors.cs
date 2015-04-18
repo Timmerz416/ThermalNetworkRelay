@@ -343,7 +343,7 @@ namespace ThermalNetworkRelay {
 		//=====================================================================
 		// readLuminosity
 		//=====================================================================
-		public double readLuminosity(bool lowSignalCheck = false) {
+		public double readLuminosity() {
 			//-----------------------------------------------------------------
 			// Read the sensor measurements
 			//-----------------------------------------------------------------
@@ -353,10 +353,6 @@ namespace ThermalNetworkRelay {
 			// Get the measured luminosity in both channels
 			UInt16 chan0 = GetChannelData(Channels.Channel0);
 			UInt16 chan1 = GetChannelData(Channels.Channel1);
-
-			// Sensor signal checks
-			if((chan0 == 0xFFFF) || (chan1 == 0xFFFF)) throw new SensorException(SensorException.SignalError.Saturated);	// Check for sensor saturation
-			if(lowSignalCheck && ((chan0 < 10) || (chan1 < 10))) throw new SensorException(SensorException.SignalError.Low);	// Check for low signal
 
 			//-----------------------------------------------------------------
 			// Determine scaling
@@ -401,39 +397,76 @@ namespace ThermalNetworkRelay {
 		// readOptimizedLuminosity
 		//=====================================================================
 		public double readOptimizedLuminosity() {
+			//-----------------------------------------------------------------
+			// Read the sensor measurements
+			//-----------------------------------------------------------------
 			// Initialize values
 			double luminosity = LUX_ERROR;
 			bool luxCaptured = false;
+			UInt16 chan0 = 0;
+			UInt16 chan1 = 0;
 
-			//-----------------------------------------------------------------
-			// Loop until the best representation of the luminosity found
-			//-----------------------------------------------------------------
+			// Sensor signal checks
 			while(!luxCaptured) {
-				// Get the measured luminosity
-				try {
-					luminosity = readLuminosity(true);
-					luxCaptured = true;
-				} catch(SensorException sensorResponse) {
-					// Determine timing adjustments
-					if(sensorResponse.Error == SensorException.SignalError.Saturated) {
-						// Sensor saturated, so adjust timing
-						if(_gain == GainOptions.High) _gain = GainOptions.Low;	// Lower the gain
-						else if((int) _intPeriod > 0) --_intPeriod;	// Reduce the integration time
-						else luxCaptured = true;	// Can't make any further adjustments
-					} else {
-						// Low signal, so again try adjusting timing
-						if((int) _intPeriod < 2) ++_intPeriod;	// Increase the integration time
-						else if(_gain == GainOptions.Low) _gain = GainOptions.High;	// Increase the gain
-						else {
-							luminosity = readLuminosity();	// The measured value is the best on
-							luxCaptured = true;
-						}
-					}
+				// Get the measured luminosity in both channels
+				chan0 = GetChannelData(Channels.Channel0);
+				chan1 = GetChannelData(Channels.Channel1);
 
-					// Make adjustments if needed
-					if(!luxCaptured) SetTiming(_gain, _intPeriod);	// A bit crude, but fine for now
-				}
+				// Evaluate the signal strength
+				if((chan0 == 0xFFFF) || (chan1 == 0xFFFF)) {	// Saturated signal
+					// Sensor saturated, so adjust timing
+					if(_gain == GainOptions.High) _gain = GainOptions.Low;	// Lower the gain
+					else if((int) _intPeriod > 0) --_intPeriod;	// Reduce the integration time
+					else luxCaptured = true;	// Can't make any further adjustments
+				} else if((chan0 < 10) || (chan1 < 10)) {	// Low signal
+					// Low signal, so again try adjusting timing
+					if((int) _intPeriod < 2) ++_intPeriod;	// Increase the integration time
+					else if(_gain == GainOptions.Low) _gain = GainOptions.High;	// Increase the gain
+					else {
+						luminosity = readLuminosity();	// The measured value is the best one
+						luxCaptured = true;
+					}
+				} else luxCaptured = true;	// Signal is fine, return from loop and calculate
+
+				// Make adjustments if needed
+				if(!luxCaptured) SetTiming(_gain, _intPeriod);	// A bit crude, but fine for now
 			}
+
+			//-----------------------------------------------------------------
+			// Determine scaling
+			//-----------------------------------------------------------------
+			double scale;
+
+			// First, account for integration time
+			switch(_intPeriod) {
+				case IntegrationOptions.Short:
+					scale = 402.0/13.7;
+					break;
+				case IntegrationOptions.Medium:
+					scale = 402.0/101.0;
+					break;
+				default:
+					scale = 1.0;
+					break;
+			}
+
+			// Adjust for gain
+			if(_gain == GainOptions.Low) scale *= 16.0;
+
+			//-----------------------------------------------------------------
+			// Calculate luminosity
+			//-----------------------------------------------------------------
+			// Scale the readings
+			double d0 = scale*chan0;
+			double d1 = scale*chan1;
+
+			// Calculation from the TSL2561 datasheet
+			double ratio = (double) chan1 / (double) chan0;
+			if(ratio <= 0.5) luminosity = 0.0304*d0 - 0.062*System.Math.Pow(ratio, 1.4)*d0;
+			else if(ratio <= 0.61) luminosity = 0.0224*d0 - 0.031*d1;
+			else if(ratio <= 0.8) luminosity = 0.0128*d0 - 0.0153*d1;
+			else if(ratio <= 1.3) luminosity = 0.00146*d0 - 0.00112*d1;
+			else luminosity = 0.0;
 
 			return luminosity;
 		}
