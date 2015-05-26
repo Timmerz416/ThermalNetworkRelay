@@ -38,8 +38,8 @@ namespace ThermalNetworkRelay {
 		private static double overrideTemp = 0;	// Contains the override temperature the thermostat is targetting
 
 		// Timing variables
-//		private const int CONTROL_INTERVAL = 60000;		// For debugging
-		private const int CONTROL_INTERVAL = 300000;	// The number of microseconds between control evaluations
+		private const int CONTROL_INTERVAL = 60000;		// For debugging
+//		private const int CONTROL_INTERVAL = 300000;	// The number of microseconds between control evaluations
 		private const int SENSOR_PERIODS = 2;			// The number of control periods before a sensor evaluation
 		private static int controlLoops = 0;			// Tracks the current number of control loops without a sensor loop
 		private static bool sensorSent = false;			// Tracks whether the controller is waiting for a sensor acknowledgement
