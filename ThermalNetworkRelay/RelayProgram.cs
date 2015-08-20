@@ -75,6 +75,7 @@ namespace ThermalNetworkRelay {
 		const byte CMD_RULE_CHANGE	= 3;
 		const byte CMD_SENSOR_DATA	= 4;
 		const byte CMD_TIME_REQUEST	= 5;
+		const byte CMD_STATUS		= 6;
 
 		// XBee subcommand codes
 		const byte CMD_NACK			= 0;
@@ -381,6 +382,50 @@ namespace ThermalNetworkRelay {
 							Debug.Print("Received command to time request mode (" + command[1] + ") not implemented");
 							dataPacket = new byte[] { CMD_TIME_REQUEST, command[1], CMD_NACK };
 							break;
+					}
+					break;
+				//-------------------------------------------------------------
+				case CMD_STATUS:
+					// Setup the byte array with thermostat and relay status
+					dataPacket = new byte[11];
+					dataPacket[0] = CMD_STATUS;
+					dataPacket[1] = BitConverter.GetBytes(thermoOn)[0];
+					dataPacket[2] = BitConverter.GetBytes(relayOn)[0];
+
+					// Get the tempeature reading
+					double temperature = tempSensor.readTemperature();
+					byte[] tArray = BitConverter.GetBytes((float) temperature);
+					for(int i = 0; i < 4; i++) dataPacket[3+i] = tArray[i];
+
+					// Get the time and weekday for evaluating the rules
+					double evalTime = DateTime.Now.Hour + DateTime.Now.Minute/60.0 + DateTime.Now.Second/3600.0;
+					RuleDays curWeekday = (RuleDays) ((int) DateTime.Now.DayOfWeek);	// Cast the returned DayOfWeek enum into the custome DayType enum
+
+					// Determine the target temperature
+					bool ruleFound = false;	// Flags that a rule has been found
+					while(!ruleFound) {
+						// Iterate through the rules until the active one is found
+						for(int i = 0; i < rules.Count; i++) {
+							// Check to see if current rule applies
+							TemperatureRule curRule = rules[i] as TemperatureRule;
+							if(RuleApplies(curRule, curWeekday, evalTime)) {
+								// Rule applies, so get the target temperature
+								tArray = BitConverter.GetBytes((float) curRule.Temperature);
+								for(int j = 0; j < 4; j++) dataPacket[7+j] = tArray[j];
+
+								// Rule found, so break from the loops
+								ruleFound = true;
+								break;
+							}
+						}
+
+						// No rule was found to apply, so move the day back before checking against rules again
+						if(!ruleFound) {
+							// Decrease the indicated day, but increase the time
+							if(curWeekday == RuleDays.Sunday) curWeekday = RuleDays.Saturday;
+							else curWeekday = (RuleDays) ((int) curWeekday - 1);
+							evalTime += 24.0;
+						}
 					}
 					break;
 				//-------------------------------------------------------------
