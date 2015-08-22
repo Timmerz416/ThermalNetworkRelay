@@ -62,12 +62,13 @@ namespace ThermalNetworkRelay {
 		// XBee data codes
 		const byte TEMPERATURE_CODE	=   1;
 		const byte LUMINOSITY_CODE	=   2;
-		const byte PRESSURE_CODE	=   4;
-		const byte HUMIDITY_CODE	=   8;
-		const byte POWER_CODE		=  16;
-		const byte LUX_CODE			=  32;
-		const byte HEATING_CODE		=  64;
-		const byte THERMOSTAT_CODE	= 128;
+		const byte PRESSURE_CODE	=   3;
+		const byte HUMIDITY_CODE	=   4;
+		const byte POWER_CODE		=   5;
+		const byte LUX_CODE			=   6;
+		const byte HEATING_CODE		=   7;
+		const byte THERMOSTAT_CODE	=   8;
+		const byte TEMP_12BYTE_CODE	=   9;
 
 		// XBee command codes
 		const byte CMD_THERMO_POWER	= 1;
