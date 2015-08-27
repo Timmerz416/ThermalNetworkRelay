@@ -10,6 +10,7 @@ using NETMF.OpenSource.XBee.Api;
 using NETMF.OpenSource.XBee.Api.Zigbee;
 using RuleDays = ThermalNetworkRelay.TemperatureRule.RuleDays;
 using AnalogChannels = SecretLabs.NETMF.Hardware.Netduino.AnalogChannels;
+using System.IO.Ports;
 
 namespace ThermalNetworkRelay {
 
@@ -94,6 +95,9 @@ namespace ThermalNetworkRelay {
 		private static bool xbeeConnected = false;	// A flag to indicate there is a connection to the XBee (true) or not (false)
 		const string COORD_ADDRESS = "00 00 00 00 00 00 00 00";	// The address of the coordinator
 
+		// Logger Members
+		private static SerialPort dataLogger;	// The port of the OpenLogger device
+
 		//=====================================================================
 		// SENSOR SETUP
 		//=====================================================================
@@ -113,6 +117,10 @@ namespace ThermalNetworkRelay {
 
 			// Initialize the relay status
 			SetRelay(false);
+
+			// Initialize the logger
+			dataLogger = new SerialPort("COM2", 9600);	// RX and TX lines connected to digital pins 2 and 3 for COM2
+			dataLogger.Open();
 
 			// Initialize the XBee
 			Debug.Print("Initializing XBee...");
@@ -137,6 +145,10 @@ namespace ThermalNetworkRelay {
 
 			// Setup and start the timer
 			Timer dataPoll = new Timer(new TimerCallback(OnTimer), null, 5000, CONTROL_INTERVAL);	// Timer delays for 5 seconds first time around, then every control interval
+
+			// Log the startup time
+			string start_log = "Device restarted at " + DateTime.Now.ToString();
+			dataLogger.Write(System.Text.Encoding.UTF8.GetBytes(start_log), 0, start_log.Length);
 
 			//-----------------------------------------------------------------
 			// INFINTE LOOP TO CHECK POWER STATUS
