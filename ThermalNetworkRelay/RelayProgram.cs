@@ -38,6 +38,11 @@ namespace ThermalNetworkRelay {
 		private static bool overrideOn = false;	// Keeps track of whether the programming override mode is on or off
 		private static double overrideTemp = 0;	// Contains the override temperature the thermostat is targetting
 
+		// Measurement members
+		private static float temperature;		// Contains the most recent measured temperature
+		private static float humidity;			// Contains the most recent measured humidity
+		private static float luminosity;		// Contains the most recent measured luminosity
+
 		// Timing variables
 		private const int CONTROL_INTERVAL = 60000;		// The number of microseconds between control evaluations
 		private const int SENSOR_PERIODS = 10;			// The number of control periods before a sensor evaluation
@@ -95,8 +100,13 @@ namespace ThermalNetworkRelay {
 		private static bool xbeeConnected = false;	// A flag to indicate there is a connection to the XBee (true) or not (false)
 		const string COORD_ADDRESS = "00 00 00 00 00 00 00 00";	// The address of the coordinator
 
-		// Logger Members
-		private static SerialPort dataLogger;	// The port of the OpenLogger device
+		//=====================================================================
+		// DATA LOGGER SETUP
+		//=====================================================================
+		private static SerialPort dataLogger = null;	// The port of the OpenLogger device
+
+		// Log types enum
+		private enum LogCode { Status, Data, Error, Warning }
 
 		//=====================================================================
 		// SENSOR SETUP
@@ -109,57 +119,61 @@ namespace ThermalNetworkRelay {
 		// MAIN PROGRAM
 		//=====================================================================
 		public static void Main() {
-			//-----------------------------------------------------------------
-			// INITIALIZE THE TIME, RADIOS, TIMERS AND RULES
-			//-----------------------------------------------------------------
-			// Set the time on the netduino on startup from the DS1307 clock
-			Utility.SetLocalTime(timeKeeper.GetTime().getDateTime());
+			try {
+				//-----------------------------------------------------------------
+				// INITIALIZE THE TIME, RADIOS, TIMERS AND RULES
+				//-----------------------------------------------------------------
+				// Set the time on the netduino on startup from the DS1307 clock
+				Utility.SetLocalTime(timeKeeper.GetTime().getDateTime());
 
-			// Initialize the relay status
-			SetRelay(false);
+				// Initialize the relay status
+				SetRelay(false);
 
-			// Initialize the logger
-			dataLogger = new SerialPort("COM2", 9600);	// RX and TX lines connected to digital pins 2 and 3 for COM2
-			dataLogger.Open();
+				// Initialize the logger
+				dataLogger = new SerialPort("COM2", 9600);	// RX and TX lines connected to digital pins 2 and 3 for COM2
+				dataLogger.Open();
 
-			// Initialize the XBee
-			Debug.Print("Initializing XBee...");
-			xBee = new XBeeApi("COM1", 9600);	// RX and TX lines connected to digital pins 0 and 1 for COM1
-			xBee.EnableDataReceivedEvent();
-			xBee.EnableAddressLookup();
-			xBee.EnableModemStatusEvent();
-			xBee.DataReceived += xBee_RequestReceived;
-			NETMF.OpenSource.XBee.Util.Logger.Initialize(Debug.Print, NETMF.OpenSource.XBee.Util.LogLevel.All);
+				// Log the startup time
+				LogMessage(LogCode.Status, "Device restarted");
 
-			// Connect to the XBee
-			ConnectToXBee();
+				// Initialize the XBee
+				LogMessage(LogCode.Status, "Initializing XBee");
+				xBee = new XBeeApi("COM1", 9600);	// RX and TX lines connected to digital pins 0 and 1 for COM1
+				xBee.EnableDataReceivedEvent();
+				xBee.EnableAddressLookup();
+				xBee.EnableModemStatusEvent();
+				xBee.DataReceived += xBee_RequestReceived;
+				NETMF.OpenSource.XBee.Util.Logger.Initialize(Debug.Print, NETMF.OpenSource.XBee.Util.LogLevel.All);
 
-			// Create the default rules
-			rules = new ArrayList();
-			rules.Add(new TemperatureRule(RuleDays.Weekdays, 23.5, 19.0));
-			rules.Add(new TemperatureRule(RuleDays.Weekdays, 16.5, 22.0));
-			rules.Add(new TemperatureRule(RuleDays.Weekdays, 9.0, 18.0));
-			rules.Add(new TemperatureRule(RuleDays.Weekdays, 7.0, 22.0));
-			rules.Add(new TemperatureRule(RuleDays.Weekends, 23.5, 19.0));
-			rules.Add(new TemperatureRule(RuleDays.Weekends, 7.5, 22.0));
+				// Connect to the XBee
+				ConnectToXBee();
 
-			// Setup and start the timer
-			Timer dataPoll = new Timer(new TimerCallback(OnTimer), null, 5000, CONTROL_INTERVAL);	// Timer delays for 5 seconds first time around, then every control interval
+				// Create the default rules
+				rules = new ArrayList();
+				rules.Add(new TemperatureRule(RuleDays.Weekdays, 23.5, 19.0));
+				rules.Add(new TemperatureRule(RuleDays.Weekdays, 16.5, 22.0));
+				rules.Add(new TemperatureRule(RuleDays.Weekdays, 9.0, 18.0));
+				rules.Add(new TemperatureRule(RuleDays.Weekdays, 7.0, 22.0));
+				rules.Add(new TemperatureRule(RuleDays.Weekends, 23.5, 19.0));
+				rules.Add(new TemperatureRule(RuleDays.Weekends, 7.5, 22.0));
 
-			// Log the startup time
-			string start_log = "Device restarted at " + DateTime.Now.ToString();
-			dataLogger.Write(System.Text.Encoding.UTF8.GetBytes(start_log), 0, start_log.Length);
+				// Setup and start the timer
+				Timer dataPoll = new Timer(new TimerCallback(OnTimer), null, 5000, CONTROL_INTERVAL);	// Timer delays for 5 seconds first time around, then every control interval
 
-			//-----------------------------------------------------------------
-			// INFINTE LOOP TO CHECK POWER STATUS
-			//-----------------------------------------------------------------
-			while(true) {
-				// Check the status of the thermostat based on power from on/off switch (high = on; low = off)
-				double powerLevel = 3.3*pwrInput.Read();	// The .Read() method return the fraction of the full pin voltage (3.3 V), with some offset which isn't important for this basic switch
+				//-----------------------------------------------------------------
+				// INFINTE LOOP TO CHECK POWER STATUS
+				//-----------------------------------------------------------------
+				while(true) {
+					// Check the status of the thermostat based on power from on/off switch (high = on; low = off)
+					double powerLevel = 3.3*pwrInput.Read();	// The .Read() method return the fraction of the full pin voltage (3.3 V), with some offset which isn't important for this basic switch
 
-				// Evaluate the thermostat and relay control based on the current voltage level
-				if((powerLevel > 1.5) && !thermoOn) SetPowerMode(true);			// Turn on the thermostat if previously off
-				else if((powerLevel < 1.5) && thermoOn) SetPowerMode(false);	// Turn off the thermostat if previously on
+					// Evaluate the thermostat and relay control based on the current voltage level
+					if((powerLevel > 1.5) && !thermoOn) SetPowerMode(true);			// Turn on the thermostat if previously off
+					else if((powerLevel < 1.5) && thermoOn) SetPowerMode(false);	// Turn off the thermostat if previously on
+				}
+			} catch(Exception ex) {
+				// Log any unhandled exceptions before the code freezes - may not work if the expection is thrown before the datalogger is initialized
+				if(dataLogger != null) LogMessage(LogCode.Error, "Unhandled exception found with message => " + ex.Message);
 			}
 		}
 
@@ -179,9 +193,9 @@ namespace ThermalNetworkRelay {
 					// Connect to the XBee
 					xBee.Open();
 					xbeeConnected = true;	// Set connected status
-					Debug.Print("XBee Connected...");
+					LogMessage(LogCode.Status, "XBee connected");
 				} catch(Exception xbeeIssue) {	// This assumes only xBee.Open command throws exceptions
-					Debug.Print("Caught the following trying to open the XBee connection: " + xbeeIssue.Message);
+					LogMessage(LogCode.Error, "Caught the following trying to open the XBee connection: " + xbeeIssue.Message);
 					return false;	// Signal that the connection failed
 				}
 			}
@@ -206,7 +220,7 @@ namespace ThermalNetworkRelay {
 			// Print out the received request
 			string message = "Received the following message from " + sender.ToString() + ": ";
 			for(int i = 0; i < request.Length; i++) message += request[i].ToString("X") + (i == (request.Length - 1) ? "" : "-");
-			Debug.Print(message);
+			LogMessage(LogCode.Status, message);
 
 			// Process the request and get the response data
 			byte[] response = ProcessRequest(request);
@@ -233,7 +247,7 @@ namespace ThermalNetworkRelay {
 			switch(command[0]) {
 				//-------------------------------------------------------------
 				case CMD_THERMO_POWER:	// Command sent to power on/off the thermostat
-					Debug.Print("Received command to change thermostat power status to " + (command[1] == STATUS_ON ? "ON" : "OFF") + " - NOT IMPLEMENTED IN HARDWARE");
+					LogMessage(LogCode.Warning, "Received command to change thermostat power status to " + (command[1] == STATUS_ON ? "ON" : "OFF") + " - NOT IMPLEMENTED IN HARDWARE");
 					dataPacket = new byte[] { CMD_THERMO_POWER, CMD_ACK };	// Acknowledge the command
 					break;
 				//-------------------------------------------------------------
@@ -244,7 +258,7 @@ namespace ThermalNetworkRelay {
 					switch(command[1]) {
 						case STATUS_OFF:	// Turn off override mode
 							overrideOn = false;	// Turn off override status
-							Debug.Print("Received command to turn off override mode");
+							LogMessage(LogCode.Status, "Received command to turn off override mode");
 							break;
 						case STATUS_ON:	// Turn on override mode
 							// Convert the byte array to a float (1st byte is the command, 2nd to 5th bytes are the float)
@@ -254,10 +268,10 @@ namespace ThermalNetworkRelay {
 
 							// Change override status
 							overrideOn = true;	// Turn on override status
-							Debug.Print("Received command to turn on override mode with target temperature of " + overrideTemp);
+							LogMessage(LogCode.Status, "Received command to turn on override mode with a target temperature of " + overrideTemp);
 							break;
 						default:	// Command not defined
-							Debug.Print("Received command to override mode (" + command[1] + ") not implemented");
+							LogMessage(LogCode.Warning, "Received command to override mode (" + command[1] + ") not implemented");
 							dataPacket[1] = CMD_NACK;	// Indicate that the command is not understood
 							break;
 					}
@@ -268,11 +282,13 @@ namespace ThermalNetworkRelay {
 					switch(command[1]) {
 						//-----------------------
 						case STATUS_GET:
+							LogMessage(LogCode.Status, "Received request to get thermostat rules");
 							dataPacket = ProcessGetRuleCMD();	// Get the rules and incorporate them into the response packet
 							break;
 						//-----------------------
 						case STATUS_ADD:
 							// Create default return packet
+							LogMessage(LogCode.Status, "Received request to add new thermostat rule");
 							dataPacket = new byte[] { CMD_RULE_CHANGE, STATUS_ADD, CMD_NACK };
 
 							// Check that the index makes sense
@@ -296,6 +312,7 @@ namespace ThermalNetworkRelay {
 						//-----------------------
 						case STATUS_DELETE:
 							// Create the default return packet
+							LogMessage(LogCode.Status, "Received request to delete thermostat rule");
 							dataPacket = new byte[] { CMD_RULE_CHANGE, STATUS_DELETE, CMD_NACK };
 
 							// Delete the entry if it makes sense
@@ -307,6 +324,7 @@ namespace ThermalNetworkRelay {
 						//-----------------------
 						case STATUS_MOVE:
 							// Create the default return packet
+							LogMessage(LogCode.Status, "Received request to move thermostat rule");
 							dataPacket = new byte[] { CMD_RULE_CHANGE, STATUS_MOVE, CMD_NACK };
 
 							// Check that the indicies are valid
@@ -322,6 +340,7 @@ namespace ThermalNetworkRelay {
 						//-----------------------
 						case STATUS_UPDATE:
 							// Create default return packet
+							LogMessage(LogCode.Status, "Received request to update an existing thermostat rule");
 							dataPacket = new byte[] { CMD_RULE_CHANGE, STATUS_UPDATE, CMD_NACK };
 
 							// Check that the index makes sense
@@ -345,7 +364,7 @@ namespace ThermalNetworkRelay {
 							break;
 						//-----------------------
 						default:
-							Debug.Print("Received command to rule change mode (" + command[1] + ") not implemented");
+							LogMessage(LogCode.Warning, "Received command for thermostat rule change (" + command[1] + ") that has not been implemented yet");
 							dataPacket = new byte[] { CMD_RULE_CHANGE, CMD_NACK };
 							break;
 					}
@@ -356,18 +375,19 @@ namespace ThermalNetworkRelay {
 					if(sensorSent) {
 						switch(command[1]) {
 							case CMD_NACK:
-								// TODO => Save the alst sensor data to the data logger
-								Debug.Print("Need to write last sensor data to logger!");
+								// Write the data to the logger
+								LogMessage(LogCode.Data, temperature + "," + luminosity + "," + humidity + ",3.3," + (thermoOn ? "1.0," : "0.0,") + (relayOn ? "1.0" : "0.0"));
+								sensorSent = false;	// No need to try and send the data anymore
 								break;
 							case CMD_ACK:
 								sensorSent = false;	// Identify that there isn't a sensor reading not acknowledged
-								Debug.Print("Sensor data acknowledged!");
+								LogMessage(LogCode.Status, "Sensor data acknowledged!");
 								break;
 							default:
-								Debug.Print("Received command to sensor data mode (" + command[1] + ") not implemented");
+								LogMessage(LogCode.Warning, "Received command to sensor data mode (" + command[1] + ") not implemented");
 								break;
 						}
-					} else Debug.Print("Receiving sensor command without having sent unacknowledged sensor data - not sure how this happened!");
+					} else LogMessage(LogCode.Error, "Receiving sensor command without having sent unacknowledged sensor data - not sure how this happened!");
 					break;
 				//-------------------------------------------------------------
 				case CMD_TIME_REQUEST:	// Interact with the DS1307 on the I2C bus
@@ -375,6 +395,7 @@ namespace ThermalNetworkRelay {
 					switch(command[1]) {
 						case STATUS_GET:	// Get the current time on the DS1307
 							// Get the time from the RTC and create the packet
+							LogMessage(LogCode.Status, "Received request to get the current time");
 							DS1307BusSensor.RTCTime curTime = timeKeeper.GetTime();
 							dataPacket = new byte[] { CMD_TIME_REQUEST, STATUS_GET, curTime.second, curTime.minute, curTime.hour, curTime.weekday, curTime.day, curTime.month, curTime.year };
 							break;
@@ -382,23 +403,26 @@ namespace ThermalNetworkRelay {
 							// Check that the data is there
 							if(command.Length == 9) {
 								// Convert to a time structure and send to DS1307
+								LogMessage(LogCode.Status, "Received request to set the current time");
 								DS1307BusSensor.RTCTime setTime = new DS1307BusSensor.RTCTime(command[2], command[3], command[4], command[6], command[7], command[8], (DS1307BusSensor.DayOfWeek) command[5]);
 								timeKeeper.SetTime(setTime);
 								dataPacket = new byte[] { CMD_TIME_REQUEST, STATUS_UPDATE, CMD_ACK };
 							} else {
 								// Return an NACK
-								Debug.Print("Received command to set the time with incorrect number of command elements (" + command.Length + ")!");
+								LogMessage(LogCode.Status, "Received command to set the time with incorrect number of command elements (" + command.Length + ")!");
 								dataPacket = new byte[] { CMD_TIME_REQUEST, STATUS_UPDATE, CMD_NACK };
 							}
 							break;
 						default:	// Command not implemented
-							Debug.Print("Received command to time request mode (" + command[1] + ") not implemented");
+							LogMessage(LogCode.Warning, "Received command to time request mode (" + command[1] + ") not implemented");
 							dataPacket = new byte[] { CMD_TIME_REQUEST, command[1], CMD_NACK };
 							break;
 					}
 					break;
 				//-------------------------------------------------------------
 				case CMD_STATUS:
+					LogMessage(LogCode.Status, "Received request to get the current thermostat status");
+
 					// Setup the byte array with thermostat and relay status
 					dataPacket = new byte[11];
 					dataPacket[0] = CMD_STATUS;
@@ -406,8 +430,8 @@ namespace ThermalNetworkRelay {
 					dataPacket[2] = BitConverter.GetBytes(relayOn)[0];
 
 					// Get the tempeature reading
-					double temperature = tempSensor.readTemperature();
-					byte[] tArray = BitConverter.GetBytes((float) temperature);
+					double curTemp = tempSensor.readTemperature();
+					byte[] tArray = BitConverter.GetBytes((float) curTemp);
 					for(int i = 0; i < 4; i++) dataPacket[3+i] = tArray[i];
 
 					// Get the time and weekday for evaluating the rules
@@ -443,7 +467,7 @@ namespace ThermalNetworkRelay {
 					break;
 				//-------------------------------------------------------------
 				default:// Acknowledge the command, even though it doesn't exist
-					Debug.Print("TxRequest type has not been implemented yet");
+					LogMessage(LogCode.Warning, "TxRequest type has not been implemented yet");
 					dataPacket = new byte[] { CMD_OVERRIDE, CMD_NACK };
 					break;
 			}
@@ -512,7 +536,8 @@ namespace ThermalNetworkRelay {
 			// Create debug console message
 			string message = "Sending message to " + destination.ToString() + " (";
 			for(int i = 0; i < payload.Length; i++) message += payload[i].ToString("X") + (i == (payload.Length - 1) ? "" : "-");
-			message += ") => ";
+			message += ")";
+			LogMessage(LogCode.Status, message);
 
 			// Connect to the XBee
 			bool sentMessage = false;
@@ -520,14 +545,14 @@ namespace ThermalNetworkRelay {
 				try {
 					// Send the response
 					xBee.Send(response).NoResponse();	// Send packet
-					message += "Sent";
 					sentMessage = true;
+					LogMessage(LogCode.Status, "XBee transmission sent");
 				} catch(XBeeTimeoutException) {
 					message += "Timeout";
+					LogMessage(LogCode.Error, "XBee timed out trying to send message");
 				}  // OTHER EXCEPTION TYPES TO INCLUDE?
-			} else message += "XBee Disconnected";
+			} else LogMessage(LogCode.Error, "XBee not connected and cannot send message");
 
-			Debug.Print(message);
 			return sentMessage;
 		}
 
@@ -537,22 +562,22 @@ namespace ThermalNetworkRelay {
 		/// <summary>
 		/// Send a sensor data package to the system logger.
 		/// </summary>
-		/// <param name="temperature">The measured temperature to send</param>
-		private static void SendSensorData(double temperature) {
+		/// <param name="externalTemperature">The measured temperature to send</param>
+		private static void SendSensorData(double externalTemperature) {
 			//-----------------------------------------------------------------
 			// GET ANY DATA FOR THE TRANSMISSION
 			//-----------------------------------------------------------------
 			// Get temperature
-			float floatTemp = (temperature == TEMP_UNDEFINED) ? (float) tempSensor.readTemperature() : (float) temperature;	// Convert double to float
-			Debug.Print("\tMeasured temperature = " + floatTemp);
+			temperature = (externalTemperature == TEMP_UNDEFINED) ? (float) tempSensor.readTemperature() : (float) externalTemperature;	// Convert double to float
+			Debug.Print("\tMeasured temperature = " + temperature);
 
 			// Get luminosity
 			luxSensor.SetTiming(TSL2561BusSensor.GainOptions.Low, TSL2561BusSensor.IntegrationOptions.Medium);
-			float luminosity = (float) luxSensor.readOptimizedLuminosity();
+			luminosity = (float) luxSensor.readOptimizedLuminosity();
 			Debug.Print("\tMeasured luminosity = " + luminosity);
 
 			// Get humidity
-			float humidity = (float) tempSensor.readHumidity();
+			humidity = (float) tempSensor.readHumidity();
 			Debug.Print("\tMeasured humidity = " + humidity);
 
 			// Get status indicators
@@ -565,7 +590,7 @@ namespace ThermalNetworkRelay {
 			//-----------------------------------------------------------------
 			// Convert the floats to byte arrays
 			byte[] tempBytes, luxBytes, humidityBytes, powerBytes, thermoBytes, relayBytes;
-			tempBytes = FloatToByte(floatTemp);
+			tempBytes = FloatToByte(temperature);
 			luxBytes = FloatToByte(luminosity);
 			humidityBytes = FloatToByte(humidity);
 			powerBytes = FloatToByte(power);
@@ -636,20 +661,20 @@ namespace ThermalNetworkRelay {
 			// Get the time and weekday for evaluating the rules
 			double curTime = DateTime.Now.Hour + DateTime.Now.Minute/60.0 + DateTime.Now.Second/3600.0;
 			RuleDays curWeekday = (RuleDays) ((int) DateTime.Now.DayOfWeek);	// Cast the returned DayOfWeek enum into the custome DayType enum
-			Debug.Print("Evaluating relay status on a " + curWeekday + " (" + DateTime.Now.ToString("dddd") + ") at " + curTime.ToString("F4") + " (" + DateTime.Now.ToString() + ") with measured temperature at " + temperature.ToString("F") + ": ");
+			LogMessage(LogCode.Status, "Evaluating relay status on day " + curWeekday + " (" + DateTime.Now.ToString("dddd") + ") at " + curTime.ToString("F4") + " with measured temperature at " + temperature.ToString("F"));
 
 			//-----------------------------------------------------------------
 			// TEMPERATURE LIMITS CHECK
 			//-----------------------------------------------------------------
 			bool updatePacket = forceUpdate;	// Default value for update data packet is from a parameter for a forced update
 			if(temperature < MIN_TEMPERATURE) {	// Temperature too low
-				Debug.Print("\tRelay turned on due to low temperature");
+				LogMessage(LogCode.Status, "\tRelay turned on due to low temperature");
 				if(!relayOn) {
 					SetRelay(true);	// Turn on relay
 					updatePacket = true;	// Indicate to dispatch change of relay state
 				}
 			} else if(temperature >= MAX_TEMPERATURE) {	// Temperature above limit
-				Debug.Print("\tRelay turned off due to high temperature");
+				LogMessage(LogCode.Status, "\tRelay turned off due to high temperature");
 				if(relayOn) {
 					SetRelay(false);	// Turn off relay
 					updatePacket = true;	// Indicate to dispatch change of relay state
@@ -662,13 +687,13 @@ namespace ThermalNetworkRelay {
 					// Turn off relay
 					SetRelay(false);
 					updatePacket = true;
-					Debug.Print("\tOVERRIDE MODE: Relay turned OFF since temperature (" + temperature.ToString("F") + ") is greater than unbuffered override temperature (" + overrideTemp.ToString("F") + ")");
+					LogMessage(LogCode.Status, "\tOVERRIDE MODE: Relay turned OFF since temperature (" + temperature.ToString("F") + ") is greater than unbuffered override temperature (" + overrideTemp.ToString("F") + ")");
 				} else if(!relayOn && (temperature < (overrideTemp - TEMPERATURE_BUFFER))) {
 					// Turn on relay
 					SetRelay(true);
 					updatePacket = true;
-					Debug.Print("\tOVERRIDE MODE: Relay turned ON since temperature (" + temperature.ToString("F") + ") is less than unbuffered override temperature (" + overrideTemp.ToString("F") + ")");
-				} else Debug.Print("\tOVERRIDE MODE: Relay remains " + (relayOn ? "ON" : "OFF"));
+					LogMessage(LogCode.Status, "\tOVERRIDE MODE: Relay turned ON since temperature (" + temperature.ToString("F") + ") is less than unbuffered override temperature (" + overrideTemp.ToString("F") + ")");
+				}
 			} else {	// Temperature is within limits, so evaluate relay status based on rules in effect
 				//-------------------------------------------------------------
 				// EVALUATE RELAY STATUS AGAINST PROGRAMMING
@@ -686,15 +711,15 @@ namespace ThermalNetworkRelay {
 								// Temperature exceeding rule, turn off relay
 								SetRelay(false);
 								updatePacket = true;	// Indicate to send the updated status
-								Debug.Print("\tRelay turned OFF since temperature (" + temperature.ToString("F") + ") is greater than the unbuffered rule temperature (" + curRule.Temperature.ToString("F") + ")");
+								LogMessage(LogCode.Status, "\tRelay turned OFF since temperature (" + temperature.ToString("F") + ") is greater than the unbuffered rule temperature (" + curRule.Temperature.ToString("F") + ")");
 							} else if(!relayOn && (temperature < (curRule.Temperature - TEMPERATURE_BUFFER))) {
 								// Temperature below rule, turn on relay
 								SetRelay(true);
 								updatePacket = true;	// Inidcate to send teh updated status
-								Debug.Print("\tRelay turned ON since temperature (" + temperature.ToString("F") + ") is less than the unbuffered rule temperature (" + curRule.Temperature.ToString("F") + ")");
+								LogMessage(LogCode.Status, "\tRelay turned ON since temperature (" + temperature.ToString("F") + ") is less than the unbuffered rule temperature (" + curRule.Temperature.ToString("F") + ")");
 							} else {
 								// No relay status change needed, but check for a forced status update
-								Debug.Print("\tRelay remains " + (relayOn ? "ON" : "OFF"));
+								//Debug.Print("\tRelay remains " + (relayOn ? "ON" : "OFF"));
 							}
 
 							// Rule found, so break from the loops
@@ -788,7 +813,7 @@ namespace ThermalNetworkRelay {
 			if(turnOn) {
 				// Update the thermostat status indicators
 				thermoOn = true;	// Set the master flag
-				Debug.Print("Thermostat turned ON");
+				LogMessage(LogCode.Status, "Thermostat turned ON");
 
 				// Determine the relay status
 				SetRelay(false);	// Turn off the relay by default as the programming logic will evaluate its status
@@ -796,7 +821,7 @@ namespace ThermalNetworkRelay {
 			} else {
 				// Update the thermostat status indicators
 				thermoOn = false;	// Set the master flag
-				Debug.Print("Thermostat turned OFF");
+				LogMessage(LogCode.Status, "Thermostat turned OFF");
 
 				// Open the relay for external control
 				SetRelay(true);	// Open the relay
@@ -880,6 +905,43 @@ namespace ThermalNetworkRelay {
 				relayStatusOutput.Write(false);	// Turn off LED
 				relayOn = false;	// Set master flag
 			}
+		}
+
+		//=====================================================================
+		// LogMessage
+		//=====================================================================
+		/// <summary>
+		/// 
+		/// </summary>
+		/// <param name="message"></param>
+		/// <param name="debug"></param>
+		/// <param name="timestamp"></param>
+		private static void LogMessage(LogCode type, string message, bool debug = true, bool timestamp = true) {
+			// Get the timestamp, if required
+			string time_str = timestamp ? DateTime.Now.ToString() : "";
+
+			// Determine the log code
+			string header = "";
+			switch(type) {
+				case LogCode.Status:
+					header = "[STATUS]";
+					break;
+				case LogCode.Data:
+					header = "[DATA]";
+					break;
+				case LogCode.Error:
+					header = "[ERROR]";
+					break;
+				case LogCode.Warning:
+					header = "[WARNING]";
+					break;
+			}
+
+			// Create the message and send to the logger
+			string log_msg = header + " " + time_str + " -> " + message;
+			if(debug) Debug.Print(log_msg);	// Print to the debug console
+			log_msg += "\n";
+			if(dataLogger.IsOpen) dataLogger.Write(System.Text.Encoding.UTF8.GetBytes(log_msg), 0, log_msg.Length);
 		}
 	}
 }
