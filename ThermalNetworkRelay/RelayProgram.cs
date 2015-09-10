@@ -45,7 +45,7 @@ namespace ThermalNetworkRelay {
 
 		// Timing variables
 		private const int CONTROL_INTERVAL = 60000;		// The number of microseconds between control evaluations
-		private const int SENSOR_PERIODS = 10;			// The number of control periods before a sensor evaluation
+		private const int SENSOR_PERIODS = 5;			// The number of control periods before a sensor evaluation
 		private static int controlLoops = 0;			// Tracks the current number of control loops without a sensor loop
 		private static bool sensorSent = false;			// Tracks whether the controller is waiting for a sensor acknowledgement
 		private const int RELAY_DELAY = 10;				// The number of milliseconds to power the relay state to ensure a transition
@@ -134,7 +134,7 @@ namespace ThermalNetworkRelay {
 				dataLogger.Open();
 
 				// Log the startup time
-				LogMessage(LogCode.Status, "Device restarted");
+				LogMessage(LogCode.Status, "Device restarted with relay OFF");
 
 				// Initialize the XBee
 				LogMessage(LogCode.Status, "Initializing XBee");
@@ -220,7 +220,7 @@ namespace ThermalNetworkRelay {
 			// Print out the received request
 			string message = "Received the following message from " + sender.ToString() + ": ";
 			for(int i = 0; i < request.Length; i++) message += request[i].ToString("X") + (i == (request.Length - 1) ? "" : "-");
-			LogMessage(LogCode.Status, message);
+			Debug.Print(message);
 
 			// Process the request and get the response data
 			byte[] response = ProcessRequest(request);
@@ -381,7 +381,7 @@ namespace ThermalNetworkRelay {
 								break;
 							case CMD_ACK:
 								sensorSent = false;	// Identify that there isn't a sensor reading not acknowledged
-								LogMessage(LogCode.Status, "Sensor data acknowledged!");
+								LogMessage(LogCode.Status, "\tSensor data acknowledged!");
 								break;
 							default:
 								LogMessage(LogCode.Warning, "Received command to sensor data mode (" + command[1] + ") not implemented");
@@ -546,12 +546,12 @@ namespace ThermalNetworkRelay {
 					// Send the response
 					xBee.Send(response).NoResponse();	// Send packet
 					sentMessage = true;
-					LogMessage(LogCode.Status, "XBee transmission sent");
+					LogMessage(LogCode.Status, "\tXBee transmission sent");
 				} catch(XBeeTimeoutException) {
 					message += "Timeout";
-					LogMessage(LogCode.Error, "XBee timed out trying to send message");
+					LogMessage(LogCode.Error, "\tXBee timed out trying to send message");
 				}  // OTHER EXCEPTION TYPES TO INCLUDE?
-			} else LogMessage(LogCode.Error, "XBee not connected and cannot send message");
+			} else LogMessage(LogCode.Error, "\tXBee not connected and cannot send message");
 
 			return sentMessage;
 		}
@@ -668,14 +668,14 @@ namespace ThermalNetworkRelay {
 			//-----------------------------------------------------------------
 			bool updatePacket = forceUpdate;	// Default value for update data packet is from a parameter for a forced update
 			if(temperature < MIN_TEMPERATURE) {	// Temperature too low
-				LogMessage(LogCode.Status, "\tRelay turned on due to low temperature");
 				if(!relayOn) {
+					LogMessage(LogCode.Status, "\tRelay turned on due to temperature below minimum limit");
 					SetRelay(true);	// Turn on relay
 					updatePacket = true;	// Indicate to dispatch change of relay state
 				}
 			} else if(temperature >= MAX_TEMPERATURE) {	// Temperature above limit
-				LogMessage(LogCode.Status, "\tRelay turned off due to high temperature");
 				if(relayOn) {
+					LogMessage(LogCode.Status, "\tRelay turned off due to temperature above temperature limit");
 					SetRelay(false);	// Turn off relay
 					updatePacket = true;	// Indicate to dispatch change of relay state
 				}
