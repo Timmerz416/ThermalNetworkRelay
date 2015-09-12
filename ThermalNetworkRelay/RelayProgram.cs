@@ -477,6 +477,23 @@ namespace ThermalNetworkRelay {
 		}
 
 		//=====================================================================
+		// DataCheckThread
+		//=====================================================================
+		/// <summary>
+		/// The method that becomes a thread to check that the message was
+		/// successfully sent to the coordinator, or save in the log
+		/// </summary>
+		static void DataCheckThread() {
+			// Wait some time and then check to see if a response was received
+			Thread.Sleep(3000);	// Sleep for 3 seconds
+			if(sensorSent) {
+				// This means that the message was not cleared, so save it to the log
+				LogMessage(LogCode.Data, temperature + "," + luminosity + "," + humidity + ",3.3," + (thermoOn ? "1.0," : "0.0,") + (relayOn ? "1.0" : "0.0"));
+				sensorSent = false;	// No need to try and send the data anymore
+			}
+		}
+
+		//=====================================================================
 		// ProcessGetRuleCMD
 		//=====================================================================
 		/// <summary>
@@ -625,6 +642,10 @@ namespace ThermalNetworkRelay {
 			// Create the TxRequest packet and send the data
 			XBeeAddress64 loggerAddress = new XBeeAddress64(COORD_ADDRESS);
 			sensorSent = SendXBeeTransmission(package, loggerAddress);
+
+			// Start the thread to check the success of the transmission
+			Thread trackerThread = new Thread(DataCheckThread);
+			trackerThread.Start();
 		}
 
 		//=====================================================================
@@ -911,11 +932,12 @@ namespace ThermalNetworkRelay {
 		// LogMessage
 		//=====================================================================
 		/// <summary>
-		/// 
+		/// Method to write messages to the log and debug screen
 		/// </summary>
-		/// <param name="message"></param>
-		/// <param name="debug"></param>
-		/// <param name="timestamp"></param>
+		/// <param name="type">The type of the message</param>
+		/// <param name="message">The message to be written</param>
+		/// <param name="debug">Flag to write to the debug screen (default is true)</param>
+		/// <param name="timestamp">Flag to write out the time of the message (default is true)</param>
 		private static void LogMessage(LogCode type, string message, bool debug = true, bool timestamp = true) {
 			// Get the timestamp, if required
 			string time_str = timestamp ? DateTime.Now.ToString() : "";
