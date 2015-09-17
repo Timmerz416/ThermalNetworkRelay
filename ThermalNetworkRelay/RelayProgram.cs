@@ -104,6 +104,7 @@ namespace ThermalNetworkRelay {
 		// DATA LOGGER SETUP
 		//=====================================================================
 		private static SerialPort dataLogger = null;	// The port of the OpenLogger device
+		private static byte ESC_CHAR = 26;				// The escape character for setting the device in command mode (Ctrl-Z)
 
 		// Log types enum
 		private enum LogCode { Status, Data, Error, Warning }
@@ -148,6 +149,17 @@ namespace ThermalNetworkRelay {
 				// Connect to the XBee
 				ConnectToXBee();
 
+				// Check to see if rules file exists
+				if(StartLoggerCommandMode()) {
+					// Get the size of the rules.txt file
+					dataLogger.Write(System.Text.Encoding.UTF8.GetBytes("size rules.txt"), 0, 14);
+
+					// Read the size
+					Thread.Sleep(50);
+					byte[] sizeStr = new byte[dataLogger.BytesToRead];
+					dataLogger.Read(sizeStr, 0, dataLogger.BytesToRead);
+				}
+
 				// Create the default rules
 				rules = new ArrayList();
 				rules.Add(new TemperatureRule(RuleDays.Weekdays, 23.5, 19.0));
@@ -175,6 +187,29 @@ namespace ThermalNetworkRelay {
 				// Log any unhandled exceptions before the code freezes - may not work if the expection is thrown before the datalogger is initialized
 				if(dataLogger != null) LogMessage(LogCode.Error, "Unhandled exception found with message => " + ex.Message);
 			}
+		}
+
+		//=====================================================================
+		// StartOpenLogCommands
+		//=====================================================================
+		private static bool StartLoggerCommandMode() {
+			// Check that the logger is open
+			if(dataLogger.IsOpen) {
+				// Send the Ctrl-Z sequence to put into command mode
+				dataLogger.WriteByte(ESC_CHAR);
+				dataLogger.WriteByte(ESC_CHAR);
+				dataLogger.WriteByte(ESC_CHAR);
+
+				// Wait to get the command line
+				Thread.Sleep(100);
+				if(dataLogger.BytesToRead > 0) {
+					byte[] str = new byte[dataLogger.BytesToRead];
+					dataLogger.Read(str, 0, dataLogger.BytesToRead);
+					if((str.Length == 2) && (str[1] == '>')) return true;
+				}
+
+				return false;
+			} else return false;	// Indicate that command mode wasn't initiated
 		}
 
 		//=====================================================================
