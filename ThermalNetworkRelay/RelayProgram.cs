@@ -103,10 +103,11 @@ namespace ThermalNetworkRelay {
 		//=====================================================================
 		// DATA LOGGER SETUP
 		//=====================================================================
-		private static SerialPort dataLogger = null;	// The port of the OpenLogger device
+		private static SerialPort dataLogger = null;		// The port of the OpenLogger device
+		private static LogCode LogLevel = LogCode.Status;	// Identifies the lowest level messages to log
 
 		// Log types enum
-		private enum LogCode { Status, Data, Error, Warning }
+		private enum LogCode { Data, Error, System, Warning, Status }
 
 		//=====================================================================
 		// SENSOR SETUP
@@ -134,7 +135,7 @@ namespace ThermalNetworkRelay {
 				dataLogger.Open();
 
 				// Log the startup time
-				LogMessage(LogCode.Status, "Device restarted with relay OFF");
+				LogMessage(LogCode.System, "Device restarted with relay OFF");
 
 				// Initialize the XBee
 				LogMessage(LogCode.Status, "Initializing XBee");
@@ -563,12 +564,12 @@ namespace ThermalNetworkRelay {
 					// Send the response
 					xBee.Send(response).NoResponse();	// Send packet
 					sentMessage = true;
-					LogMessage(LogCode.Status, "\tXBee transmission sent");
+					LogMessage(LogCode.Status, "XBee transmission sent");
 				} catch(XBeeTimeoutException) {
 					message += "Timeout";
-					LogMessage(LogCode.Error, "\tXBee timed out trying to send message");
+					LogMessage(LogCode.Error, "XBee timed out trying to send message: " + message);
 				}  // OTHER EXCEPTION TYPES TO INCLUDE?
-			} else LogMessage(LogCode.Error, "\tXBee not connected and cannot send message");
+			} else LogMessage(LogCode.Error, "XBee not connected and cannot send message");
 
 			return sentMessage;
 		}
@@ -834,7 +835,7 @@ namespace ThermalNetworkRelay {
 			if(turnOn) {
 				// Update the thermostat status indicators
 				thermoOn = true;	// Set the master flag
-				LogMessage(LogCode.Status, "Thermostat turned ON");
+				LogMessage(LogCode.System, "Thermostat turned ON");
 
 				// Determine the relay status
 				SetRelay(false);	// Turn off the relay by default as the programming logic will evaluate its status
@@ -842,7 +843,7 @@ namespace ThermalNetworkRelay {
 			} else {
 				// Update the thermostat status indicators
 				thermoOn = false;	// Set the master flag
-				LogMessage(LogCode.Status, "Thermostat turned OFF");
+				LogMessage(LogCode.System, "Thermostat turned OFF");
 
 				// Open the relay for external control
 				SetRelay(true);	// Open the relay
@@ -917,6 +918,7 @@ namespace ThermalNetworkRelay {
 
 				relayStatusOutput.Write(true);	// Turn on LED
 				relayOn = true;	// Set master flag
+				LogMessage(LogCode.System, "Relay turned ON");
 			} else if(!openRelay && relayOn) {
 				// Turn off relay
 				relayPinOff.Write(true);
@@ -925,6 +927,7 @@ namespace ThermalNetworkRelay {
 
 				relayStatusOutput.Write(false);	// Turn off LED
 				relayOn = false;	// Set master flag
+				LogMessage(LogCode.System, "Relay turned OFF");
 			}
 		}
 
@@ -945,17 +948,20 @@ namespace ThermalNetworkRelay {
 			// Determine the log code
 			string header = "";
 			switch(type) {
-				case LogCode.Status:
-					header = "[STATUS]";
-					break;
 				case LogCode.Data:
 					header = "[DATA]";
 					break;
 				case LogCode.Error:
 					header = "[ERROR]";
 					break;
+				case LogCode.System:
+					header = "[SYSTEM]";
+					break;
 				case LogCode.Warning:
 					header = "[WARNING]";
+					break;
+				case LogCode.Status:
+					header = "[STATUS]";
 					break;
 			}
 
@@ -963,7 +969,7 @@ namespace ThermalNetworkRelay {
 			string log_msg = header + " " + time_str + " -> " + message;
 			if(debug) Debug.Print(log_msg);	// Print to the debug console
 			log_msg += "\n";
-			if(dataLogger.IsOpen) dataLogger.Write(System.Text.Encoding.UTF8.GetBytes(log_msg), 0, log_msg.Length);
+			if(dataLogger.IsOpen && (type <= LogLevel)) dataLogger.Write(System.Text.Encoding.UTF8.GetBytes(log_msg), 0, log_msg.Length);
 		}
 	}
 }
