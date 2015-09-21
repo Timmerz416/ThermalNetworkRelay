@@ -45,7 +45,8 @@ namespace ThermalNetworkRelay {
 
 		// Timing variables
 		private const int CONTROL_INTERVAL = 60000;		// The number of microseconds between control evaluations
-		private const int SENSOR_PERIODS = 5;			// The number of control periods before a sensor evaluation
+		private const int SENSOR_PERIODS = 5;			// DEBUGGING - The number of control periods before a sensor evaluation
+//		private const int SENSOR_PERIODS = 10;			// The number of control periods before a sensor evaluation
 		private static int controlLoops = 0;			// Tracks the current number of control loops without a sensor loop
 		private static bool sensorSent = false;			// Tracks whether the controller is waiting for a sensor acknowledgement
 		private const int RELAY_DELAY = 10;				// The number of milliseconds to power the relay state to ensure a transition
