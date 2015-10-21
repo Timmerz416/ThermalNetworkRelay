@@ -22,12 +22,14 @@ namespace ThermalNetworkRelay {
 		private static AnalogInput pwrInput = new AnalogInput(AnalogChannels.ANALOG_PIN_A0);	// Analog input to read thermostat power status
 
 		// Digital output ports
-		private static OutputPort relayStatusOutput = new OutputPort(Pins.GPIO_PIN_D5, false);		// Output port for the relay status LED
+		private static OutputPort relayStatusOutput = new OutputPort(Pins.GPIO_PIN_D5, false);		// Output port for the relay status LED and/or the relay control
+		private static OutputPort powerStatusOutput = new OutputPort(Pins.GPIO_PIN_D10, true);		// Output port for the power status LED
 		private static OutputPort onboardLED = new OutputPort(Pins.ONBOARD_LED, false);				// Turn off the onboard LED
 
 		// Relay control ports
-		private static OutputPort relayPinOn = new OutputPort(Pins.GPIO_PIN_D6, false);		// Turning port high will close the relay
-		private static OutputPort relayPinOff = new OutputPort(Pins.GPIO_PIN_D7, false);	// Turning port high will open the relay
+		private static OutputPort relayPinOn = new OutputPort(Pins.GPIO_PIN_D6, false);		// Turning port high will close the relay, for latching relay
+		private static OutputPort relayPinOff = new OutputPort(Pins.GPIO_PIN_D7, false);	// Turning port high will open the relay, for latching relay
+		private static OutputPort relayControlOutput = new OutputPort(Pins.GPIO_PIN_D11, false);	// Output port to control the relay, for non-latching relay
 
 		//=====================================================================
 		// THERMOSTAT CONTROL MEMBERS
@@ -836,6 +838,7 @@ namespace ThermalNetworkRelay {
 			if(turnOn) {
 				// Update the thermostat status indicators
 				thermoOn = true;	// Set the master flag
+				powerStatusOutput.Write(true);	// Turn on the LED
 				LogMessage(LogCode.System, "Thermostat turned ON");
 
 				// Determine the relay status
@@ -844,6 +847,7 @@ namespace ThermalNetworkRelay {
 			} else {
 				// Update the thermostat status indicators
 				thermoOn = false;	// Set the master flag
+				powerStatusOutput.Write(false);	// Turn off the LED
 				LogMessage(LogCode.System, "Thermostat turned OFF");
 
 				// Open the relay for external control
@@ -913,20 +917,22 @@ namespace ThermalNetworkRelay {
 		private static void SetRelay(bool openRelay) {
 			if(openRelay && !relayOn) {	// Turn on relay only when it's off
 				// Turn on relay
-				relayPinOn.Write(true);
+/*				relayPinOn.Write(true);
 				Thread.Sleep(RELAY_DELAY);
-				relayPinOn.Write(false);
+				relayPinOn.Write(false);*/
+				relayControlOutput.Write(true);
 
-				relayStatusOutput.Write(true);	// Turn on LED
+//				relayStatusOutput.Write(true);	// Turn on LED
 				relayOn = true;	// Set master flag
 				LogMessage(LogCode.System, "Relay turned ON");
 			} else if(!openRelay && relayOn) {
 				// Turn off relay
-				relayPinOff.Write(true);
+/*				relayPinOff.Write(true);
 				Thread.Sleep(RELAY_DELAY);
-				relayPinOff.Write(false);
+				relayPinOff.Write(false);*/
+				relayControlOutput.Write(false);
 
-				relayStatusOutput.Write(false);	// Turn off LED
+//				relayStatusOutput.Write(false);	// Turn off LED
 				relayOn = false;	// Set master flag
 				LogMessage(LogCode.System, "Relay turned OFF");
 			}
