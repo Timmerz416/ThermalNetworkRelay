@@ -662,11 +662,11 @@ namespace ThermalNetworkRelay {
 		private static void OnTimer(Object dataObj) {
 			// Determine what to evaluate and send by XBee, depending on thermostat status and type of loop
 			controlLoops++;	// Increment the loop counter
-			if(thermoOn) EvaluateProgramming(controlLoops == SENSOR_PERIODS);	// Thermostat is on, so evaluate the relay status through programming rules, only force XBee data if a sensor loop
-			else if(controlLoops == SENSOR_PERIODS) SendSensorData(TEMP_UNDEFINED);	// Thermostat is off, so only send XBee data if a sensor loop
+			if(thermoOn) EvaluateProgramming(controlLoops >= SENSOR_PERIODS);	// Thermostat is on, so evaluate the relay status through programming rules, only force XBee data if a sensor loop
+			else if(controlLoops >= SENSOR_PERIODS) SendSensorData(TEMP_UNDEFINED);	// Thermostat is off, so only send XBee data if a sensor loop
 
 			// Reset the counter, if needed
-			if(controlLoops == SENSOR_PERIODS) controlLoops = 0;
+			if(controlLoops >= SENSOR_PERIODS) controlLoops = 0;
 		}
 
 		//=====================================================================
