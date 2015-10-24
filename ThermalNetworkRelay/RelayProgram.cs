@@ -131,6 +131,7 @@ namespace ThermalNetworkRelay {
 				Utility.SetLocalTime(timeKeeper.GetTime().getDateTime());
 
 				// Initialize the relay status
+				relayControlOutput.Write(true);	// Power the relay, closing the connection
 				SetRelay(false);
 
 				// Initialize the logger
@@ -920,9 +921,9 @@ namespace ThermalNetworkRelay {
 /*				relayPinOn.Write(true);
 				Thread.Sleep(RELAY_DELAY);
 				relayPinOn.Write(false);*/
-				relayControlOutput.Write(true);
+				relayControlOutput.Write(false);
 
-//				relayStatusOutput.Write(true);	// Turn on LED
+				relayStatusOutput.Write(true);	// Turn on LED
 				relayOn = true;	// Set master flag
 				LogMessage(LogCode.System, "Relay turned ON");
 			} else if(!openRelay && relayOn) {
@@ -930,9 +931,9 @@ namespace ThermalNetworkRelay {
 /*				relayPinOff.Write(true);
 				Thread.Sleep(RELAY_DELAY);
 				relayPinOff.Write(false);*/
-				relayControlOutput.Write(false);
+				relayControlOutput.Write(true);
 
-//				relayStatusOutput.Write(false);	// Turn off LED
+				relayStatusOutput.Write(false);	// Turn off LED
 				relayOn = false;	// Set master flag
 				LogMessage(LogCode.System, "Relay turned OFF");
 			}
