@@ -57,7 +57,7 @@ namespace ThermalNetworkRelay {
 		private static ArrayList rules;	// Array holding the thermostat rules
 		private const double MIN_TEMPERATURE = 16.0;	// Below this temperature, the relay opens no matter the programming
 		private const double MAX_TEMPERATURE = 25.0;	// Above this temperature, the relay closes no matter the programming
-		private const double TEMPERATURE_BUFFER = 0.5;	// The buffer to apply to the target temperature in evaluation relay status
+		private const double TEMPERATURE_BUFFER = 0.15;	// The buffer to apply to the target temperature in evaluation relay status
 
 		// Constants
 		private const double TEMP_UNDEFINED = 200.0;	// High temperature values signifies it has not been set
@@ -156,8 +156,8 @@ namespace ThermalNetworkRelay {
 				rules = new ArrayList();
 				rules.Add(new TemperatureRule(RuleDays.Weekdays, 23.5, 19.0));
 				rules.Add(new TemperatureRule(RuleDays.Weekdays, 16.5, 22.0));
-				rules.Add(new TemperatureRule(RuleDays.Weekdays, 9.0, 18.0));
-				rules.Add(new TemperatureRule(RuleDays.Weekdays, 7.0, 22.0));
+				rules.Add(new TemperatureRule(RuleDays.Weekdays, 8.0, 18.0));
+				rules.Add(new TemperatureRule(RuleDays.Weekdays, 6.5, 22.0));
 				rules.Add(new TemperatureRule(RuleDays.Weekends, 23.5, 19.0));
 				rules.Add(new TemperatureRule(RuleDays.Weekends, 7.5, 22.0));
 
@@ -740,7 +740,7 @@ namespace ThermalNetworkRelay {
 							} else if(!relayOn && (temperature < (curRule.Temperature - TEMPERATURE_BUFFER))) {
 								// Temperature below rule, turn on relay
 								SetRelay(true);
-								updatePacket = true;	// Inidcate to send teh updated status
+								updatePacket = true;	// Indicate to send the updated status
 								LogMessage(LogCode.Status, "\tRelay turned ON since temperature (" + temperature.ToString("F") + ") is less than the unbuffered rule temperature (" + curRule.Temperature.ToString("F") + ")");
 							} else {
 								// No relay status change needed, but check for a forced status update
