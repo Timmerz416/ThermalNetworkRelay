@@ -107,10 +107,10 @@ namespace ThermalNetworkRelay {
 		// DATA LOGGER SETUP
 		//=====================================================================
 		private static SerialPort dataLogger = null;		// The port of the OpenLogger device
-		private static LogCode LogLevel = LogCode.Status;	// Identifies the lowest level messages to log
+		private static LogCode LogLevel = LogCode.Debug;	// Identifies the lowest level messages to log
 
 		// Log types enum
-		private enum LogCode { Data, Error, System, Warning, Status }
+		private enum LogCode { Data, Error, System, Warning, Status, Debug }
 
 		//=====================================================================
 		// SENSOR SETUP
@@ -551,15 +551,15 @@ namespace ThermalNetworkRelay {
 			//-----------------------------------------------------------------
 			// SEND PACKET TO DESTINATION
 			//-----------------------------------------------------------------
-			// Create the transmission object to the specified destination
-			TxRequest response = new TxRequest(destination, payload);
-			response.Option = TxRequest.Options.DisableAck;
-
-			// Create debug console message
+			// Log message
 			string message = "Sending message to " + destination.ToString() + " (";
 			for(int i = 0; i < payload.Length; i++) message += payload[i].ToString("X") + (i == (payload.Length - 1) ? "" : "-");
 			message += ")";
 			LogMessage(LogCode.Status, message);
+
+			// Create the transmission object to the specified destination
+			TxRequest response = new TxRequest(destination, payload);
+			response.Option = TxRequest.Options.DisableAck;
 
 			// Connect to the XBee
 			bool sentMessage = false;
@@ -591,16 +591,16 @@ namespace ThermalNetworkRelay {
 			//-----------------------------------------------------------------
 			// Get temperature
 			temperature = (externalTemperature == TEMP_UNDEFINED) ? (float) tempSensor.readTemperature() : (float) externalTemperature;	// Convert double to float
-			Debug.Print("\tMeasured temperature = " + temperature);
+			LogMessage(LogCode.Debug, "\tMeasured temperature = " + temperature);
 
 			// Get luminosity
 			luxSensor.SetTiming(TSL2561BusSensor.GainOptions.Low, TSL2561BusSensor.IntegrationOptions.Medium);
 			luminosity = (float) luxSensor.readOptimizedLuminosity();
-			Debug.Print("\tMeasured luminosity = " + luminosity);
+			LogMessage(LogCode.Debug, "\tMeasured luminosity = " + luminosity);
 
 			// Get humidity
 			humidity = (float) tempSensor.readHumidity();
-			Debug.Print("\tMeasured humidity = " + humidity);
+			LogMessage(LogCode.Debug, "\tMeasured humidity = " + humidity);
 
 			// Get status indicators
 			float power = 3.3f;
@@ -645,6 +645,7 @@ namespace ThermalNetworkRelay {
 			// TRANSMIT THE SENSOR DATA
 			//-----------------------------------------------------------------			
 			// Create the TxRequest packet and send the data
+			LogMessage(LogCode.Debug, "Starting to send XBee message...");
 			XBeeAddress64 loggerAddress = new XBeeAddress64(COORD_ADDRESS);
 			sensorSent = SendXBeeTransmission(package, loggerAddress);
 
@@ -663,6 +664,7 @@ namespace ThermalNetworkRelay {
 		private static void OnTimer(Object dataObj) {
 			// Determine what to evaluate and send by XBee, depending on thermostat status and type of loop
 			controlLoops++;	// Increment the loop counter
+			LogMessage(LogCode.Debug, "The current control loop is " + controlLoops + " and sensor period is " + SENSOR_PERIODS);
 			if(thermoOn) EvaluateProgramming(controlLoops >= SENSOR_PERIODS);	// Thermostat is on, so evaluate the relay status through programming rules, only force XBee data if a sensor loop
 			else if(controlLoops >= SENSOR_PERIODS) SendSensorData(TEMP_UNDEFINED);	// Thermostat is off, so only send XBee data if a sensor loop
 
@@ -694,12 +696,14 @@ namespace ThermalNetworkRelay {
 			//-----------------------------------------------------------------
 			bool updatePacket = forceUpdate;	// Default value for update data packet is from a parameter for a forced update
 			if(temperature < MIN_TEMPERATURE) {	// Temperature too low
+				LogMessage(LogCode.Debug, "Measured temperature is below the minimum temperature of " + MIN_TEMPERATURE);
 				if(!relayOn) {
 					LogMessage(LogCode.Status, "\tRelay turned on due to temperature below minimum limit");
 					SetRelay(true);	// Turn on relay
 					updatePacket = true;	// Indicate to dispatch change of relay state
 				}
 			} else if(temperature >= MAX_TEMPERATURE) {	// Temperature above limit
+				LogMessage(LogCode.Debug, "Measured temperature is above the maximum temperature of " + MAX_TEMPERATURE);
 				if(relayOn) {
 					LogMessage(LogCode.Status, "\tRelay turned off due to temperature above temperature limit");
 					SetRelay(false);	// Turn off relay
@@ -709,6 +713,7 @@ namespace ThermalNetworkRelay {
 				//-------------------------------------------------------------
 				// EVALUATE RELAY STATUS AGAINST OVERRIDE TEMPERATURE
 				//-------------------------------------------------------------
+				LogMessage(LogCode.Debug, "Override mode is on - checking temperature against current override target of " + overrideTemp);
 				if(relayOn && (temperature > (overrideTemp + TEMPERATURE_BUFFER))) {
 					// Turn off relay
 					SetRelay(false);
@@ -719,12 +724,13 @@ namespace ThermalNetworkRelay {
 					SetRelay(true);
 					updatePacket = true;
 					LogMessage(LogCode.Status, "\tOVERRIDE MODE: Relay turned ON since temperature (" + temperature.ToString("F") + ") is less than unbuffered override temperature (" + overrideTemp.ToString("F") + ")");
-				}
+				} else LogMessage(LogCode.Debug, "No change to relay status required");
 			} else {	// Temperature is within limits, so evaluate relay status based on rules in effect
 				//-------------------------------------------------------------
 				// EVALUATE RELAY STATUS AGAINST PROGRAMMING
 				//-------------------------------------------------------------
 				// Iterate through the rules
+				LogMessage(LogCode.Debug, "Evaluating the temperature against the current thermostat rules");
 				bool ruleFound = false;	// Flags that a rule has been found
 				while(!ruleFound) {
 					// Iterate through the rules until the active one is found
@@ -757,17 +763,21 @@ namespace ThermalNetworkRelay {
 					// No rule was found to apply, so move the day back before checking against rules again
 					if(!ruleFound) {
 						// Decrease the indicated day, but increase the time
+						LogMessage(LogCode.Debug, "Could not find the appropriate rule, moving back one day");
 						if(curWeekday == RuleDays.Sunday) curWeekday = RuleDays.Saturday;
 						else curWeekday = (RuleDays) ((int) curWeekday - 1);
 						curTime += 24.0;
-					}
+					} else LogMessage(LogCode.Debug, "Found rule");
 				}
 			}
 
 			//-----------------------------------------------------------------
 			// SEND THE DATA
 			//-----------------------------------------------------------------
-			if(updatePacket) SendSensorData(temperature);
+			if(updatePacket) {
+				LogMessage(LogCode.Debug, "EvaluateProgramming calling for a packet update");
+				SendSensorData(temperature);
+			} else LogMessage(LogCode.Debug, "EvaluateProgramming not calling for a packet update");
 		}
 
 		//=====================================================================
@@ -970,6 +980,9 @@ namespace ThermalNetworkRelay {
 					break;
 				case LogCode.Status:
 					header = "[STATUS]";
+					break;
+				case LogCode.Debug:
+					header = "[DEBUG]";
 					break;
 			}
 
