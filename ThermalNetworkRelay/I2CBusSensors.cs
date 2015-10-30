@@ -354,41 +354,43 @@ namespace ThermalNetworkRelay {
 			UInt16 chan0 = GetChannelData(Channels.Channel0);
 			UInt16 chan1 = GetChannelData(Channels.Channel1);
 
-			//-----------------------------------------------------------------
-			// Determine scaling
-			//-----------------------------------------------------------------
-			double scale;
+			if(chan0 != 0) {	// Protect against division by zero
+				//-----------------------------------------------------------------
+				// Determine scaling
+				//-----------------------------------------------------------------
+				double scale;
 
-			// First, account for integration time
-			switch(_intPeriod) {
-				case IntegrationOptions.Short:
-					scale = 402.0/13.7;
-					break;
-				case IntegrationOptions.Medium:
-					scale = 402.0/101.0;
-					break;
-				default:
-					scale = 1.0;
-					break;
-			}
+				// First, account for integration time
+				switch(_intPeriod) {
+					case IntegrationOptions.Short:
+						scale = 402.0/13.7;
+						break;
+					case IntegrationOptions.Medium:
+						scale = 402.0/101.0;
+						break;
+					default:
+						scale = 1.0;
+						break;
+				}
 
-			// Adjust for gain
-			if(_gain == GainOptions.Low) scale *= 16.0;
+				// Adjust for gain
+				if(_gain == GainOptions.Low) scale *= 16.0;
 
-			//-----------------------------------------------------------------
-			// Calculate luminosity
-			//-----------------------------------------------------------------
-			// Scale the readings
-			double d0 = scale*chan0;
-			double d1 = scale*chan1;
+				//-----------------------------------------------------------------
+				// Calculate luminosity
+				//-----------------------------------------------------------------
+				// Scale the readings
+				double d0 = scale*chan0;
+				double d1 = scale*chan1;
 
-			// Calculation from the TSL2561 datasheet
-			double ratio = (double) chan1 / (double) chan0;
-			if(ratio <= 0.5) luminosity = 0.0304*d0 - 0.062*System.Math.Pow(ratio, 1.4)*d0;
-			else if(ratio <= 0.61) luminosity = 0.0224*d0 - 0.031*d1;
-			else if(ratio <= 0.8) luminosity = 0.0128*d0 - 0.0153*d1;
-			else if(ratio <= 1.3) luminosity = 0.00146*d0 - 0.00112*d1;
-			else luminosity = 0.0;
+				// Calculation from the TSL2561 datasheet
+				double ratio = (double) chan1 / (double) chan0;
+				if(ratio <= 0.5) luminosity = 0.0304*d0 - 0.062*System.Math.Pow(ratio, 1.4)*d0;
+				else if(ratio <= 0.61) luminosity = 0.0224*d0 - 0.031*d1;
+				else if(ratio <= 0.8) luminosity = 0.0128*d0 - 0.0153*d1;
+				else if(ratio <= 1.3) luminosity = 0.00146*d0 - 0.00112*d1;
+				else luminosity = 0.0;
+			} else luminosity = 0.0;	// Set the luminosity to 0
 
 			return luminosity;
 		}
@@ -432,41 +434,43 @@ namespace ThermalNetworkRelay {
 				if(!luxCaptured) SetTiming(_gain, _intPeriod);	// A bit crude, but fine for now
 			}
 
-			//-----------------------------------------------------------------
-			// Determine scaling
-			//-----------------------------------------------------------------
-			double scale;
+			if(chan0 != 0) {	// Check for division by zero
+				//-----------------------------------------------------------------
+				// Determine scaling
+				//-----------------------------------------------------------------
+				double scale;
 
-			// First, account for integration time
-			switch(_intPeriod) {
-				case IntegrationOptions.Short:
-					scale = 402.0/13.7;
-					break;
-				case IntegrationOptions.Medium:
-					scale = 402.0/101.0;
-					break;
-				default:
-					scale = 1.0;
-					break;
-			}
+				// First, account for integration time
+				switch(_intPeriod) {
+					case IntegrationOptions.Short:
+						scale = 402.0/13.7;
+						break;
+					case IntegrationOptions.Medium:
+						scale = 402.0/101.0;
+						break;
+					default:
+						scale = 1.0;
+						break;
+				}
 
-			// Adjust for gain
-			if(_gain == GainOptions.Low) scale *= 16.0;
+				// Adjust for gain
+				if(_gain == GainOptions.Low) scale *= 16.0;
 
-			//-----------------------------------------------------------------
-			// Calculate luminosity
-			//-----------------------------------------------------------------
-			// Scale the readings
-			double d0 = scale*chan0;
-			double d1 = scale*chan1;
+				//-----------------------------------------------------------------
+				// Calculate luminosity
+				//-----------------------------------------------------------------
+				// Scale the readings
+				double d0 = scale*chan0;
+				double d1 = scale*chan1;
 
-			// Calculation from the TSL2561 datasheet
-			double ratio = (double) chan1 / (double) chan0;
-			if(ratio <= 0.5) luminosity = 0.0304*d0 - 0.062*System.Math.Pow(ratio, 1.4)*d0;
-			else if(ratio <= 0.61) luminosity = 0.0224*d0 - 0.031*d1;
-			else if(ratio <= 0.8) luminosity = 0.0128*d0 - 0.0153*d1;
-			else if(ratio <= 1.3) luminosity = 0.00146*d0 - 0.00112*d1;
-			else luminosity = 0.0;
+				// Calculation from the TSL2561 datasheet
+				double ratio = (double) chan1 / (double) chan0;
+				if(ratio <= 0.5) luminosity = 0.0304*d0 - 0.062*System.Math.Pow(ratio, 1.4)*d0;
+				else if(ratio <= 0.61) luminosity = 0.0224*d0 - 0.031*d1;
+				else if(ratio <= 0.8) luminosity = 0.0128*d0 - 0.0153*d1;
+				else if(ratio <= 1.3) luminosity = 0.00146*d0 - 0.00112*d1;
+				else luminosity = 0.0;
+			} else luminosity = 0.0;	// Set luminosity to zero
 
 			return luminosity;
 		}

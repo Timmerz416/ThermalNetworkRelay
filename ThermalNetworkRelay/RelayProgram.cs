@@ -47,15 +47,15 @@ namespace ThermalNetworkRelay {
 
 		// Timing variables
 		private const int CONTROL_INTERVAL = 60000;		// The number of microseconds between control evaluations
-		private const int SENSOR_PERIODS = 5;			// DEBUGGING - The number of control periods before a sensor evaluation
-//		private const int SENSOR_PERIODS = 10;			// The number of control periods before a sensor evaluation
+//		private const int SENSOR_PERIODS = 5;			// DEBUGGING - The number of control periods before a sensor evaluation
+		private const int SENSOR_PERIODS = 10;			// The number of control periods before a sensor evaluation
 		private static int controlLoops = 0;			// Tracks the current number of control loops without a sensor loop
 		private static bool sensorSent = false;			// Tracks whether the controller is waiting for a sensor acknowledgement
 		private const int RELAY_DELAY = 10;				// The number of milliseconds to power the relay state to ensure a transition
 
 		// Thermostat rule variables
 		private static ArrayList rules;	// Array holding the thermostat rules
-		private const double MIN_TEMPERATURE = 16.0;	// Below this temperature, the relay opens no matter the programming
+		private const double MIN_TEMPERATURE = 15.0;	// Below this temperature, the relay opens no matter the programming
 		private const double MAX_TEMPERATURE = 25.0;	// Above this temperature, the relay closes no matter the programming
 		private const double TEMPERATURE_BUFFER = 0.15;	// The buffer to apply to the target temperature in evaluation relay status
 
@@ -78,6 +78,7 @@ namespace ThermalNetworkRelay {
 		const byte HEATING_CODE		=   7;
 		const byte THERMOSTAT_CODE	=   8;
 		const byte TEMP_12BYTE_CODE	=   9;
+		const byte BATTERY_SOC_CODE	=  10;
 
 		// XBee command codes
 		const byte CMD_THERMO_POWER	= 1;
