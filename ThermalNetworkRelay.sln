@@ -3,7 +3,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Express 2012 for Windows Desktop
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ThermalNetworkRelay", "ThermalNetworkRelay\ThermalNetworkRelay.csproj", "{46A12EB3-55F4-4FD6-8F0E-7B29DA4CDDD8}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "XBee", "..\..\CodePlex\GBee\source\XBee_42\XBee.csproj", "{7F280F44-4AE1-4917-83BC-36825E729EC2}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "XBee", "..\..\..\CodePlex\xbee\source\XBee_42\XBee.csproj", "{7F280F44-4AE1-4917-83BC-36825E729EC2}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

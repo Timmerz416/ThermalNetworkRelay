@@ -49,7 +49,7 @@
     <Reference Include="SecretLabs.NETMF.Hardware.Netduino" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\..\CodePlex\GBee\source\XBee_42\XBee.csproj">
+    <ProjectReference Include="..\..\..\..\CodePlex\xbee\source\XBee_42\XBee.csproj">
       <Project>{7F280F44-4AE1-4917-83BC-36825E729EC2}</Project>
       <Name>XBee</Name>
     </ProjectReference>
