@@ -98,6 +98,7 @@ namespace ThermalNetworkRelay {
 		const byte STATUS_DELETE	= 6;
 		const byte STATUS_MOVE		= 7;
 		const byte STATUS_UPDATE	= 8;
+        const byte STATUS_SET       = 9;
 
 		// XBee Connection Members
 		private static XBeeApi xBee;				// The object controlling the interface to the XBee radio
@@ -371,7 +372,7 @@ namespace ThermalNetworkRelay {
 						//-----------------------
 						default:
 							LogMessage(LogCode.Warning, "Received command for thermostat rule change (" + command[1] + ") that has not been implemented yet");
-							dataPacket = new byte[] { CMD_RULE_CHANGE, CMD_NACK };
+							dataPacket = new byte[] { CMD_RULE_CHANGE, command[1], CMD_NACK };
 							break;
 					}
 					break;
@@ -405,18 +406,18 @@ namespace ThermalNetworkRelay {
 							DS1307BusSensor.RTCTime curTime = timeKeeper.GetTime();
 							dataPacket = new byte[] { CMD_TIME_REQUEST, STATUS_GET, curTime.second, curTime.minute, curTime.hour, curTime.weekday, curTime.day, curTime.month, curTime.year };
 							break;
-						case STATUS_UPDATE:	// Set the time on the DS1307
+						case STATUS_SET:	// Set the time on the DS1307
 							// Check that the data is there
 							if(command.Length == 9) {
 								// Convert to a time structure and send to DS1307
 								LogMessage(LogCode.Status, "Received request to set the current time");
 								DS1307BusSensor.RTCTime setTime = new DS1307BusSensor.RTCTime(command[2], command[3], command[4], command[6], command[7], command[8], (DS1307BusSensor.DayOfWeek) command[5]);
 								timeKeeper.SetTime(setTime);
-								dataPacket = new byte[] { CMD_TIME_REQUEST, STATUS_UPDATE, CMD_ACK };
+								dataPacket = new byte[] { CMD_TIME_REQUEST, STATUS_SET, CMD_ACK };
 							} else {
 								// Return an NACK
-								LogMessage(LogCode.Status, "Received command to set the time with incorrect number of command elements (" + command.Length + ")!");
-								dataPacket = new byte[] { CMD_TIME_REQUEST, STATUS_UPDATE, CMD_NACK };
+								LogMessage(LogCode.Warning, "Received command to set the time with incorrect number of command elements (" + command.Length + ")!");
+								dataPacket = new byte[] { CMD_TIME_REQUEST, STATUS_SET, CMD_NACK };
 							}
 							break;
 						default:	// Command not implemented
