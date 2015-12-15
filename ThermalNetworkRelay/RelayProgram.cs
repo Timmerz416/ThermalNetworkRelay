@@ -387,7 +387,7 @@ namespace ThermalNetworkRelay {
 						switch(command[1]) {
 							case CMD_NACK:
 								// Write the data to the logger
-								LogMessage(LogCode.Data, temperature + "," + luminosity + "," + humidity + ",3.3," + (thermoOn ? "1.0," : "0.0,") + (relayOn ? "1.0" : "0.0"));
+								LogMessage(LogCode.Data, temperature + "," + luminosity + "," + humidity + ",3.3," + (thermoOn ? "1.0," : "0.0,") + (relayOn ? "1.0," : "0.0,") + overrideTemp);
 								sensorSent = false;	// No need to try and send the data anymore
 								break;
 							case CMD_ACK:
