@@ -52,7 +52,7 @@ namespace ThermalNetworkRelay {
 
 		// Timing variables
 		private const int CONTROL_INTERVAL = 60000;		// The number of microseconds between control evaluations
-//		private const int SENSOR_PERIODS = 5;			// DEBUGGING - The number of control periods before a sensor evaluation
+//		private const int SENSOR_PERIODS = 2;			// DEBUGGING - The number of control periods before a sensor evaluation
 		private const int SENSOR_PERIODS = 10;			// The number of control periods before a sensor evaluation
 		private static int controlLoops = 0;			// Tracks the current number of control loops without a sensor loop
 		private static bool sensorSent = false;			// Tracks whether the controller is waiting for a sensor acknowledgement
@@ -269,6 +269,7 @@ namespace ThermalNetworkRelay {
 						case STATUS_OFF:	// Turn off override mode
 							overrideOn = false;	// Turn off override status
                             overrideTemp = OVERRIDE_OFF_FLAG;  // Set the temperature to off temperature
+                            EvaluateProgramming(true);  // Evaluate the new relay state, but send a relay status update no matter what
 							LogMessage(LogCode.Status, "Received command to turn off override mode");
 							break;
 						case STATUS_ON:	// Turn on override mode
@@ -279,6 +280,7 @@ namespace ThermalNetworkRelay {
 
 							// Change override status
 							overrideOn = true;	// Turn on override status
+                            EvaluateProgramming(true);  // Evaluate the new relay state, but send a relay status update no matter what
 							LogMessage(LogCode.Status, "Received command to turn on override mode with a target temperature of " + overrideTemp);
 							break;
 						default:	// Command not defined
