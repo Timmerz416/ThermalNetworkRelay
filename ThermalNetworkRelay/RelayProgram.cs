@@ -34,11 +34,16 @@ namespace ThermalNetworkRelay {
 		//=====================================================================
 		// THERMOSTAT CONTROL MEMBERS
 		//=====================================================================
+        // Constants
+        private const float OVERRIDE_OFF_FLAG = -1.0f;  // Override temperature corresponding to an inactive override mode
+        private const float OVERRIDE_LIMIT = 0f;        // Indicates the threshold for the override status
+        private const double TEMP_UNDEFINED = 200.0;	// High temperature values signifies it has not been set
+
 		// Basic status members
 		private static bool thermoOn = true;	// Keeps track of whether the thermostat is on or off
 		private static bool relayOn = false;	// Keeps track of whether the relay is on or off
 		private static bool overrideOn = false;	// Keeps track of whether the programming override mode is on or off
-		private static double overrideTemp = 0;	// Contains the override temperature the thermostat is targetting
+		private static float overrideTemp = OVERRIDE_OFF_FLAG;	// Contains the override temperature the thermostat is targetting
 
 		// Measurement members
 		private static float temperature;		// Contains the most recent measured temperature
@@ -59,9 +64,6 @@ namespace ThermalNetworkRelay {
 		private const double MAX_TEMPERATURE = 25.0;	// Above this temperature, the relay closes no matter the programming
 		private const double TEMPERATURE_BUFFER = 0.15;	// The buffer to apply to the target temperature in evaluation relay status
 
-		// Constants
-		private const double TEMP_UNDEFINED = 200.0;	// High temperature values signifies it has not been set
-
 		//=====================================================================
 		// XBEE SETUP
 		//=====================================================================
@@ -79,6 +81,7 @@ namespace ThermalNetworkRelay {
 		const byte THERMOSTAT_CODE	=   8;
 		const byte TEMP_12BYTE_CODE	=   9;
 		const byte BATTERY_SOC_CODE	=  10;
+        const byte OVERRIDE_CODE    =  11;
 
 		// XBee command codes
 		const byte CMD_THERMO_POWER	= 1;
@@ -265,13 +268,14 @@ namespace ThermalNetworkRelay {
 					switch(command[1]) {
 						case STATUS_OFF:	// Turn off override mode
 							overrideOn = false;	// Turn off override status
+                            overrideTemp = OVERRIDE_OFF_FLAG;  // Set the temperature to off temperature
 							LogMessage(LogCode.Status, "Received command to turn off override mode");
 							break;
 						case STATUS_ON:	// Turn on override mode
 							// Convert the byte array to a float (1st byte is the command, 2nd to 5th bytes are the float)
 							byte[] tempArray = new byte[4];
 							for(int i = 0; i < 4; i++) tempArray[i] = command[i+2];	// Copy the byte array for the float
-							overrideTemp = (double) ByteToFloat(tempArray);	// Set the target override temperature
+							overrideTemp = ByteToFloat(tempArray);	// Set the target override temperature
 
 							// Change override status
 							overrideOn = true;	// Turn on override status
@@ -495,7 +499,7 @@ namespace ThermalNetworkRelay {
 			Thread.Sleep(3000);	// Sleep for 3 seconds
 			if(sensorSent) {
 				// This means that the message was not cleared, so save it to the log
-				LogMessage(LogCode.Data, temperature + "," + luminosity + "," + humidity + ",3.3," + (thermoOn ? "1.0," : "0.0,") + (relayOn ? "1.0" : "0.0"));
+				LogMessage(LogCode.Data, temperature + "," + luminosity + "," + humidity + ",3.3," + (thermoOn ? "1.0," : "0.0,") + (relayOn ? "1.0," : "0.0,") + overrideTemp);
 				sensorSent = false;	// No need to try and send the data anymore
 			}
 		}
@@ -613,18 +617,19 @@ namespace ThermalNetworkRelay {
 			// CREATE THE BYTE ARRAYS AND TRANSMISSION PACKAGE
 			//-----------------------------------------------------------------
 			// Convert the floats to byte arrays
-			byte[] tempBytes, luxBytes, humidityBytes, powerBytes, thermoBytes, relayBytes;
+			byte[] tempBytes, luxBytes, humidityBytes, powerBytes, thermoBytes, relayBytes, overrideBytes;
 			tempBytes = FloatToByte(temperature);
 			luxBytes = FloatToByte(luminosity);
 			humidityBytes = FloatToByte(humidity);
 			powerBytes = FloatToByte(power);
 			thermoBytes = FloatToByte(thermoStatus);
 			relayBytes = FloatToByte(relayStatus);
+            overrideBytes = FloatToByte(overrideTemp);
 
 			// Allocate the data package
 			int floatSize = sizeof(float);
 			Debug.Assert(floatSize == 4);
-			byte[] package = new byte[6*(floatSize+1) + 1];	// Allocate memory for the package
+			byte[] package = new byte[7*(floatSize+1) + 1];	// Allocate memory for the package
 
 			// Create the package of data
 			package[0] = CMD_SENSOR_DATA;	// Indicate the package contains sensor data
@@ -634,6 +639,7 @@ namespace ThermalNetworkRelay {
 			package[3*(floatSize+1)+1] = POWER_CODE;
 			package[4*(floatSize+1)+1] = HEATING_CODE;
 			package[5*(floatSize+1)+1] = THERMOSTAT_CODE;
+            package[6*(floatSize+1)+1] = OVERRIDE_CODE;
 			for(int i = 0; i < floatSize; i++) {
 				package[i+2] = tempBytes[i];
 				package[(floatSize+1)+(i+2)] = luxBytes[i];
@@ -641,6 +647,7 @@ namespace ThermalNetworkRelay {
 				package[3*(floatSize+1)+(i+2)] = powerBytes[i];
 				package[4*(floatSize+1)+(i+2)] = relayBytes[i];
 				package[5*(floatSize+1)+(i+2)] = thermoBytes[i];
+                package[6*(floatSize + 1)+(i+2)] = overrideBytes[i];
 			}
 
 			//-----------------------------------------------------------------
