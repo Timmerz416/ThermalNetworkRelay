@@ -437,7 +437,7 @@ namespace ThermalNetworkRelay {
 					LogMessage(LogCode.Status, "Received request to get the current thermostat status");
 
 					// Setup the byte array with thermostat and relay status
-					dataPacket = new byte[11];
+					dataPacket = new byte[12];
 					dataPacket[0] = CMD_STATUS;
 					dataPacket[1] = BitConverter.GetBytes(thermoOn)[0];
 					dataPacket[2] = BitConverter.GetBytes(relayOn)[0];
@@ -445,36 +445,48 @@ namespace ThermalNetworkRelay {
 					// Get the tempeature reading
 					double curTemp = tempSensor.readTemperature();
 					byte[] tArray = BitConverter.GetBytes((float) curTemp);
-					for(int i = 0; i < 4; i++) dataPacket[3+i] = tArray[i];
+                    for(int i = 0; i < 4; i++) dataPacket[3+i] = tArray[i];
 
-					// Get the time and weekday for evaluating the rules
-					double evalTime = DateTime.Now.Hour + DateTime.Now.Minute/60.0 + DateTime.Now.Second/3600.0;
-					RuleDays curWeekday = (RuleDays) ((int) DateTime.Now.DayOfWeek);	// Cast the returned DayOfWeek enum into the custome DayType enum
+					if(overrideOn) {	// OVERRIDE IS ON, SO RETURN THE SET TEMPERATURE
+						// Set the override flag
+						dataPacket[11] = STATUS_ON;
 
-					// Determine the target temperature
-					bool ruleFound = false;	// Flags that a rule has been found
-					while(!ruleFound) {
-						// Iterate through the rules until the active one is found
-						for(int i = 0; i < rules.Count; i++) {
-							// Check to see if current rule applies
-							TemperatureRule curRule = rules[i] as TemperatureRule;
-							if(RuleApplies(curRule, curWeekday, evalTime)) {
-								// Rule applies, so get the target temperature
-								tArray = BitConverter.GetBytes((float) curRule.Temperature);
-								for(int j = 0; j < 4; j++) dataPacket[7+j] = tArray[j];
+						// Return the override temperature
+						byte[] overArray = BitConverter.GetBytes(overrideTemp);
+						for(int i = 0; i < 4; i++) dataPacket[7+i] = overArray[i];
+					} else {	// NEED TO FIND THE CURRENT RULE
+						// Set the override flag
+						dataPacket[11] = STATUS_OFF;	// Indicates that the override mode is off
 
-								// Rule found, so break from the loops
-								ruleFound = true;
-								break;
+						// Get the time and weekday for evaluating the rules
+						double evalTime = DateTime.Now.Hour + DateTime.Now.Minute/60.0 + DateTime.Now.Second/3600.0;
+						RuleDays curWeekday = (RuleDays)((int)DateTime.Now.DayOfWeek);	// Cast the returned DayOfWeek enum into the custome DayType enum
+
+						// Determine the target temperature
+						bool ruleFound = false;	// Flags that a rule has been found
+						while(!ruleFound) {
+							// Iterate through the rules until the active one is found
+							for(int i = 0; i < rules.Count; i++) {
+								// Check to see if current rule applies
+								TemperatureRule curRule = rules[i] as TemperatureRule;
+								if(RuleApplies(curRule, curWeekday, evalTime)) {
+									// Rule applies, so get the target temperature
+									tArray = BitConverter.GetBytes((float)curRule.Temperature);
+									for(int j = 0; j < 4; j++) dataPacket[7+j] = tArray[j];
+
+									// Rule found, so break from the loops
+									ruleFound = true;
+									break;
+								}
 							}
-						}
 
-						// No rule was found to apply, so move the day back before checking against rules again
-						if(!ruleFound) {
-							// Decrease the indicated day, but increase the time
-							if(curWeekday == RuleDays.Sunday) curWeekday = RuleDays.Saturday;
-							else curWeekday = (RuleDays) ((int) curWeekday - 1);
-							evalTime += 24.0;
+							// No rule was found to apply, so move the day back before checking against rules again
+							if(!ruleFound) {
+								// Decrease the indicated day, but increase the time
+								if(curWeekday == RuleDays.Sunday) curWeekday = RuleDays.Saturday;
+								else curWeekday = (RuleDays)((int)curWeekday - 1);
+								evalTime += 24.0;
+							}
 						}
 					}
 					break;
