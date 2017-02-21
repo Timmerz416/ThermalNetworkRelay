@@ -112,7 +112,7 @@ namespace ThermalNetworkRelay {
 		// DATA LOGGER SETUP
 		//=====================================================================
 		private static SerialPort dataLogger = null;		// The port of the OpenLogger device
-		private static LogCode LogLevel = LogCode.Debug;	// Identifies the lowest level messages to log
+		private static LogCode LogLevel = LogCode.System;	// Identifies the lowest level messages to log
 
 		// Log types enum
 		private enum LogCode { Data, Error, System, Warning, Status, Debug }
