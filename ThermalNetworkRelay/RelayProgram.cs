@@ -418,7 +418,8 @@ namespace ThermalNetworkRelay {
 								// Convert to a time structure and send to DS1307
 								LogMessage(LogCode.Status, "Received request to set the current time");
 								DS1307BusSensor.RTCTime setTime = new DS1307BusSensor.RTCTime(command[2], command[3], command[4], command[6], command[7], command[8], (DS1307BusSensor.DayOfWeek) command[5]);
-								timeKeeper.SetTime(setTime);
+								timeKeeper.SetTime(setTime);	// Update the RTC Clock
+								Utility.SetLocalTime(setTime.getDateTime());	// Update the internal netduino clock
 								dataPacket = new byte[] { CMD_TIME_REQUEST, STATUS_SET, CMD_ACK };
 							} else {
 								// Return an NACK
